@@ -85,14 +85,24 @@
       camera3d = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
       camera3d.position.z = 2;
 
-      const geo = new THREE.SphereGeometry(0.12, 32, 16);
-      geo.scale(0.9, 0.35, 0.25);
-      const mat = new THREE.MeshStandardMaterial({
+      const geo = new THREE.SphereGeometry(0.18, 48, 24);
+      geo.scale(1.15, 0.28, 0.18);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i);
+        if (y > 0) pos.setY(i, y * 0.55);
+      }
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshPhysicalMaterial({
         color: 0xe91e63,
-        roughness: 0.25,
-        metalness: 0.15,
+        roughness: 0.18,
+        metalness: 0.05,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.15,
         transparent: true,
-        opacity: 0.92
+        opacity: 0.88,
+        side: THREE.DoubleSide
       });
       nailMesh = new THREE.Mesh(geo, mat);
       scene.add(nailMesh);
@@ -144,8 +154,9 @@
         const dy = tip.y - dip.y;
         const angle = Math.atan2(dy, dx);
 
-        nailTarget.x = nx;
-        nailTarget.y = ny;
+        const off = 0.08;
+        nailTarget.x = nx - Math.cos(angle) * off * aspect;
+        nailTarget.y = ny + Math.sin(angle) * off;
         nailTarget.rz = -angle;
 
         statusEl.textContent = '3D ноготь на указательном';
