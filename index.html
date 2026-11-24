@@ -3,33 +3,132 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nail AR — Simple</title>
+  <title>Nail AR</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
-    h1 { margin: 8px 0; font-size: 1.3rem; text-align: center; }
-    .status { margin: 6px 0 12px; color: #aaa; font-size: 0.9rem; text-align: center; min-height: 1.2em; }
-    .container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 3/4; background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
-    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #c8d0d8 0%, #e8eef2 35%, #f4f6f8 50%, #1a1a1a 50.1%, #0d0d0d 100%);
+      background-attachment: fixed;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin: 12px 0 8px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.4);
+      letter-spacing: -0.3px;
+    }
+    .status {
+      margin: 4px 0 16px;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,.75);
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 3/4;
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12);
+    }
+    video, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
     canvas { pointer-events: none; }
-    .controls { margin-top: 16px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
-    .color-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-    .color-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; }
-    .color-btn.active { transform: scale(1.15); }
-    button { padding: 12px 24px; font-size: 1rem; border: none; border-radius: 12px; background: #e91e63; color: white; cursor: pointer; font-weight: 600; }
-    button.secondary { background: #444; }
+    .controls {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+    }
+    .glass-btn {
+      padding: 14px 32px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 20px;
+      background: rgba(255,255,255,.18);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 8px 32px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      transition: all .2s ease;
+      text-shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+    .glass-btn:hover, .glass-btn:active {
+      background: rgba(255,255,255,.28);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.45);
+    }
+    .glass-btn.secondary {
+      background: rgba(255,255,255,.1);
+      font-weight: 500;
+    }
+    .color-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 8px;
+    }
+    .color-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      transition: transform .15s ease;
+      box-shadow: 0 6px 20px rgba(0,0,0,.3), inset 0 2px 4px rgba(255,255,255,.4), inset 0 -2px 4px rgba(0,0,0,.2);
+    }
+    .color-btn::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 50%;
+      background: inherit;
+      filter: brightness(1.1);
+    }
+    .color-btn.active, .color-btn:hover {
+      transform: scale(1.12);
+      box-shadow: 0 8px 28px rgba(0,0,0,.4), inset 0 2px 6px rgba(255,255,255,.5), 0 0 0 3px rgba(255,255,255,.4);
+    }
+    .hint {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,.55);
+      text-align: center;
+      margin-top: 6px;
+      max-width: 360px;
+    }
   </style>
 </head>
 <body>
-  <h1>Nail AR — Simple</h1>
+  <h1>Nail AR</h1>
   <div class="status" id="status">Загрузка модели...</div>
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
   </div>
   <div class="controls">
-    <button id="start">Запустить камеру</button>
-    <button id="switchCam" class="secondary" style="display:none;">Переключить камеру</button>
+    <button id="start" class="glass-btn">Запустить камеру</button>
+    <button id="switchCam" class="glass-btn secondary" style="display:none;">Переключить камеру</button>
     <div class="color-row">
       <div class="color-btn" style="background:#e91e63" data-color="#e91e63"></div>
       <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f"></div>
@@ -39,6 +138,7 @@
       <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2"></div>
     </div>
   </div>
+  <div class="hint">Сегментация ногтей в реальном времени</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
@@ -56,7 +156,7 @@
     let videoDevices = [];
     let useFront = false;
     let running = false;
-    const MODEL_SIZE = 192;
+    const MODEL_SIZE = 128;
 
     function setColor(color) {
       currentColor = color;
@@ -74,16 +174,16 @@
     }
 
     async function loadModel() {
-      statusEl.textContent = 'Загрузка U-Net модели...';
+      statusEl.textContent = 'Загрузка модели...';
       try {
         session = await ort.InferenceSession.create('./nail_unet.onnx', {
           executionProviders: ['wasm']
         });
-        statusEl.textContent = 'Модель загружена. Нажми кнопку.';
+        statusEl.textContent = 'Модель готова';
         startBtn.disabled = false;
       } catch (e) {
         console.error(e);
-        statusEl.textContent = 'Ошибка загрузки модели: ' + e.message;
+        statusEl.textContent = 'Ошибка загрузки модели';
       }
     }
 
@@ -131,7 +231,7 @@
         statusEl.textContent = preferFront ? 'Передняя камера' : 'Задняя камера';
         processLoop();
       } catch (err) {
-        statusEl.textContent = 'Ошибка камеры: ' + err.message;
+        statusEl.textContent = 'Ошибка камеры';
         startBtn.disabled = false;
         running = false;
       }
@@ -179,35 +279,27 @@
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
       const rgb = hexToRgb(currentColor);
-      const THRESHOLD = 0.62;
+      const THRESHOLD = 0.55;
 
-      let nailPixels = 0;
       for (let y = 0; y < MODEL_SIZE; y++) {
         for (let x = 0; x < MODEL_SIZE; x++) {
           const m = mask[y * MODEL_SIZE + x];
           if (m > THRESHOLD) {
-            nailPixels++;
             const px = Math.floor(x * scaleX);
             const py = Math.floor(y * scaleY);
-            const strength = Math.min(1, (m - THRESHOLD) / 0.35);
+            const strength = Math.min(1, (m - THRESHOLD) / 0.3);
             for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
               for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
                 const i = ((py + dy) * w + (px + dx)) * 4;
-                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.85) + rgb.r * strength * 0.85;
-                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.85) + rgb.g * strength * 0.85;
-                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.85) + rgb.b * strength * 0.85;
+                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.8) + rgb.r * strength * 0.8;
+                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.8) + rgb.g * strength * 0.8;
+                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.8) + rgb.b * strength * 0.8;
               }
             }
           }
         }
       }
       ctx.putImageData(imageData, 0, 0);
-
-      if (nailPixels > 20) {
-        statusEl.textContent = 'Ногти найдены (' + nailPixels + ' px)';
-      } else {
-        statusEl.textContent = 'Ногти не найдены — покажи руку ближе';
-      }
     }
 
     switchBtn.addEventListener('click', () => startCamera(!useFront));
