@@ -15,30 +15,72 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       padding: 20px 16px;
     }
+    .main-screen, .camera-screen {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .camera-screen { display: none; }
     h1 {
-      font-size: 1.6rem;
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-shadow: 0 4px 20px rgba(0,0,0,.5);
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      font-size: 1rem;
+      color: rgba(255,255,255,.7);
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .glass-btn {
+      padding: 16px 48px;
+      font-size: 1.1rem;
       font-weight: 600;
-      margin: 12px 0 8px;
-      text-shadow: 0 2px 12px rgba(0,0,0,.4);
-      letter-spacing: -0.3px;
+      border: none;
+      border-radius: 24px;
+      background: rgba(255,255,255,.18);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 10px 40px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.4), inset 0 -1px 0 rgba(0,0,0,.2);
+      border: 1px solid rgba(255,255,255,.3);
+      transition: all .25s ease;
+      text-shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+    .glass-btn:hover, .glass-btn:active {
+      background: rgba(255,255,255,.28);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 50px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.5);
+    }
+    .glass-btn.secondary {
+      background: rgba(255,255,255,.08);
+      padding: 12px 28px;
+      font-size: 0.95rem;
+      font-weight: 500;
     }
     .status {
-      margin: 4px 0 16px;
+      margin: 12px 0;
       font-size: 0.85rem;
-      color: rgba(255,255,255,.75);
+      color: rgba(255,255,255,.7);
       text-align: center;
       min-height: 1.2em;
     }
     .container {
       position: relative;
       width: 100%;
-      max-width: 420px;
       aspect-ratio: 3/4;
       border-radius: 28px;
       overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.15);
+      margin-bottom: 16px;
     }
     video, canvas {
       position: absolute;
@@ -48,105 +90,71 @@
     }
     canvas { pointer-events: none; }
     .controls {
-      margin-top: 20px;
       width: 100%;
-      max-width: 420px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       align-items: center;
-    }
-    .glass-btn {
-      padding: 14px 32px;
-      font-size: 1rem;
-      font-weight: 600;
-      border: none;
-      border-radius: 20px;
-      background: rgba(255,255,255,.18);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      color: #fff;
-      cursor: pointer;
-      box-shadow: 0 8px 32px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.15);
-      border: 1px solid rgba(255,255,255,.25);
-      transition: all .2s ease;
-      text-shadow: 0 1px 2px rgba(0,0,0,.3);
-    }
-    .glass-btn:hover, .glass-btn:active {
-      background: rgba(255,255,255,.28);
-      transform: translateY(-1px);
-      box-shadow: 0 12px 40px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.45);
-    }
-    .glass-btn.secondary {
-      background: rgba(255,255,255,.1);
-      font-weight: 500;
     }
     .color-row {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       justify-content: center;
-      padding: 8px;
     }
     .color-btn {
-      width: 52px;
-      height: 52px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       border: none;
       cursor: pointer;
-      position: relative;
       transition: transform .15s ease;
-      box-shadow: 0 6px 20px rgba(0,0,0,.3), inset 0 2px 4px rgba(255,255,255,.4), inset 0 -2px 4px rgba(0,0,0,.2);
-    }
-    .color-btn::before {
-      content: "";
-      position: absolute;
-      inset: 2px;
-      border-radius: 50%;
-      background: inherit;
-      filter: brightness(1.1);
+      box-shadow: 0 6px 20px rgba(0,0,0,.35), inset 0 2px 4px rgba(255,255,255,.4);
     }
     .color-btn.active, .color-btn:hover {
-      transform: scale(1.12);
-      box-shadow: 0 8px 28px rgba(0,0,0,.4), inset 0 2px 6px rgba(255,255,255,.5), 0 0 0 3px rgba(255,255,255,.4);
+      transform: scale(1.15);
+      box-shadow: 0 8px 28px rgba(0,0,0,.45), 0 0 0 3px rgba(255,255,255,.5);
     }
-    .hint {
-      font-size: 0.75rem;
-      color: rgba(255,255,255,.55);
-      text-align: center;
-      margin-top: 6px;
-      max-width: 360px;
-    }
+    .back-btn { margin-top: 8px; }
   </style>
 </head>
 <body>
-  <h1>Nail AR</h1>
-  <div class="status" id="status">Загрузка модели...</div>
-  <div class="container">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
+  <div class="main-screen" id="mainScreen">
+    <h1>Nail AR</h1>
+    <div class="subtitle">Примерка цвета ногтей<br>в реальном времени</div>
+    <button class="glass-btn" id="openCamera">Открыть камеру</button>
   </div>
-  <div class="controls">
-    <button id="start" class="glass-btn">Запустить камеру</button>
-    <button id="switchCam" class="glass-btn secondary" style="display:none;">Переключить камеру</button>
-    <div class="color-row">
-      <div class="color-btn" style="background:#e91e63" data-color="#e91e63"></div>
-      <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f"></div>
-      <div class="color-btn" style="background:#212121" data-color="#212121"></div>
-      <div class="color-btn" style="background:#ffffff" data-color="#ffffff"></div>
-      <div class="color-btn" style="background:#ffc107" data-color="#ffc107"></div>
-      <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2"></div>
+
+  <div class="camera-screen" id="cameraScreen">
+    <div class="status" id="status">Загрузка модели...</div>
+    <div class="container">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="controls">
+      <button id="switchCam" class="glass-btn secondary">Переключить камеру</button>
+      <div class="color-row">
+        <div class="color-btn" style="background:#e91e63" data-color="#e91e63"></div>
+        <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f"></div>
+        <div class="color-btn" style="background:#212121" data-color="#212121"></div>
+        <div class="color-btn" style="background:#ffffff" data-color="#ffffff"></div>
+        <div class="color-btn" style="background:#ffc107" data-color="#ffc107"></div>
+        <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2"></div>
+      </div>
+      <button id="backBtn" class="glass-btn secondary back-btn">Назад</button>
     </div>
   </div>
-  <div class="hint">Сегментация ногтей в реальном времени</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
+    const mainScreen = document.getElementById('mainScreen');
+    const cameraScreen = document.getElementById('cameraScreen');
+    const openCameraBtn = document.getElementById('openCamera');
+    const backBtn = document.getElementById('backBtn');
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
-    const startBtn = document.getElementById('start');
     const switchBtn = document.getElementById('switchCam');
     const colorBtns = document.querySelectorAll('.color-btn');
 
@@ -180,7 +188,6 @@
           executionProviders: ['wasm']
         });
         statusEl.textContent = 'Модель готова';
-        startBtn.disabled = false;
       } catch (e) {
         console.error(e);
         statusEl.textContent = 'Ошибка загрузки модели';
@@ -204,9 +211,7 @@
     }
 
     async function startCamera(preferFront = false) {
-      startBtn.disabled = true;
       statusEl.textContent = 'Запуск камеры...';
-      switchBtn.style.display = 'inline-block';
       useFront = preferFront;
       running = true;
 
@@ -232,9 +237,17 @@
         processLoop();
       } catch (err) {
         statusEl.textContent = 'Ошибка камеры';
-        startBtn.disabled = false;
         running = false;
       }
+    }
+
+    function stopCamera() {
+      running = false;
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      video.srcObject = null;
     }
 
     async function processLoop() {
@@ -302,8 +315,20 @@
       ctx.putImageData(imageData, 0, 0);
     }
 
+    openCameraBtn.addEventListener('click', async () => {
+      mainScreen.style.display = 'none';
+      cameraScreen.style.display = 'flex';
+      if (!session) await loadModel();
+      startCamera(false);
+    });
+
+    backBtn.addEventListener('click', () => {
+      stopCamera();
+      cameraScreen.style.display = 'none';
+      mainScreen.style.display = 'flex';
+    });
+
     switchBtn.addEventListener('click', () => startCamera(!useFront));
-    startBtn.addEventListener('click', () => startCamera(false));
 
     loadModel();
   </script>
