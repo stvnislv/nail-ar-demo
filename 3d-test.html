@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nail AR — 3D Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: #111;
+      font-family: system-ui, sans-serif;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 3/4;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #000;
+    }
+    video, #threeCanvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+    #threeCanvas { pointer-events: none; }
+    .status { margin: 12px 0; font-size: 0.9rem; color: #aaa; }
+    .glass-btn {
+      padding: 12px 28px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      cursor: pointer;
+      margin: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="status" id="status">Загрузка...</div>
+  <div class="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="threeCanvas"></canvas>
+  </div>
+  <div>
+    <button class="glass-btn" id="startBtn">Открыть камеру</button>
+    <button class="glass-btn" id="switchBtn">Переключить камеру</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('threeCanvas');
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const switchBtn = document.getElementById('switchBtn');
+
+    let stream = null;
+    let hands = null;
+    let running = false;
+    let useFront = false;
+    let videoDevices = [];
+
+    let renderer, scene, camera3d, nailMesh;
+    let nailTarget = { x: 0, y: 0, rz: 0 };
+
+    function initThree() {
+      const w = canvas.clientWidth || 400;
+      const h = canvas.clientHeight || 530;
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setSize(w, h);
+      renderer.setClearColor(0x000000, 0);
+
+      scene = new THREE.Scene();
+      camera3d = new THREE.PerspectiveCamera(50, w/h, 0.1, 10);
+      camera3d.position.z = 2;
+
+      const geo = new THREE.SphereGeometry(0.12, 32, 16);
+      geo.scale(1.6, 0.55, 0.35);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xe91e63,
+        roughness: 0.25,
+        metalness: 0.15,
+        transparent: true,
+        opacity: 0.92
+      });
+      nailMesh = new THREE.Mesh(geo, mat);
+      scene.add(nailMesh);
+
+      const light = new THREE.DirectionalLight(0xffffff, 1.2);
+      light.position.set(1, 1, 2);
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+      animate();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!nailMesh) return;
+      nailMesh.position.x += (nailTarget.x - nailMesh.position.x) * 0.25;
+      nailMesh.position.y += (nailTarget.y - nailMesh.position.y) * 0.25;
+      nailMesh.rotation.z += (nailTarget.rz - nailMesh.rotation.z) * 0.25;
+      renderer.render(scene, camera3d);
+    }
+
+    async function initHands() {
+      statusEl.textContent = 'Загрузка MediaPipe...';
+      hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5
+      });
+      hands.onResults(onResults);
+      statusEl.textContent = 'Готово';
+    }
+
+    function onResults(results) {
+      if (!running || !nailMesh) return;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const lm = results.multiHandLandmarks[0];
+        const tip = lm[8];
+        const dip = lm[7];
+
+        const nx = (tip.x - 0.5) * 2;
+        const ny = -(tip.y - 0.5) * 2;
+        const dx = tip.x - dip.x;
+        const dy = tip.y - dip.y;
+        const angle = Math.atan2(dy, dx);
+
+        nailTarget.x = nx * 0.9;
+        nailTarget.y = ny * 0.9;
+        nailTarget.rz = -angle;
+
+        statusEl.textContent = '3D ноготь на указательном';
+      } else {
+        statusEl.textContent = 'Покажи руку';
+      }
+    }
+
+    async function getCameras() {
+      try {
+        const temp = await navigator.mediaDevices.getUserMedia({ video: true });
+        temp.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(d => d.kind === 'videoinput');
+      } catch (e) {}
+    }
+
+    function findDevice(preferFront) {
+      if (!videoDevices.length) return null;
+      const front = videoDevices.find(d => /front|user|face|лиц|selfie/i.test(d.label || ''));
+      const rear = videoDevices.find(d => /back|rear|environment|задн|wide/i.test(d.label || ''));
+      return preferFront ? (front || videoDevices[0]) : (rear || videoDevices[videoDevices.length - 1] || videoDevices[0]);
+    }
+
+    async function startCamera(preferFront = false) {
+      statusEl.textContent = 'Запуск камеры...';
+      useFront = preferFront;
+      running = true;
+
+      try {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        if (!videoDevices.length) await getCameras();
+
+        const device = findDevice(preferFront);
+        const constraints = {
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: preferFront ? 'user' : 'environment' }
+        };
+        if (device && device.deviceId) constraints.video.deviceId = { exact: device.deviceId };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        await video.play();
+
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        if (renderer) renderer.setSize(rect.width, rect.height);
+        if (camera3d) {
+          camera3d.aspect = rect.width / rect.height;
+          camera3d.updateProjectionMatrix();
+        }
+
+        statusEl.textContent = 'Камера запущена';
+        processLoop();
+      } catch (err) {
+        statusEl.textContent = 'Ошибка камеры';
+        running = false;
+      }
+    }
+
+    async function processLoop() {
+      if (!running || !hands) return;
+      if (video.readyState >= 2) {
+        await hands.send({ image: video });
+      }
+      requestAnimationFrame(processLoop);
+    }
+
+    startBtn.addEventListener('click', async () => {
+      if (!hands) await initHands();
+      if (!renderer) initThree();
+      startCamera(false);
+    });
+
+    switchBtn.addEventListener('click', () => startCamera(!useFront));
+
+    initHands();
+    initThree();
+  </script>
+</body>
+</html>
