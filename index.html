@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nail AR — Robust</title>
+  <title>Nail AR — Simple</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
@@ -14,15 +14,14 @@
     canvas { pointer-events: none; }
     .controls { margin-top: 16px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
     .color-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-    .color-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; transition: transform .12s; }
-    .color-btn:hover, .color-btn.active { transform: scale(1.15); }
+    .color-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; }
+    .color-btn.active { transform: scale(1.15); }
     button { padding: 12px 24px; font-size: 1rem; border: none; border-radius: 12px; background: #e91e63; color: white; cursor: pointer; font-weight: 600; }
     button.secondary { background: #444; }
-    .hint { font-size: 0.8rem; color: #888; text-align: center; margin-top: 8px; max-width: 500px; }
   </style>
 </head>
 <body>
-  <h1>Nail AR — Robust</h1>
+  <h1>Nail AR — Simple</h1>
   <div class="status" id="status">Загрузка модели...</div>
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
@@ -32,15 +31,14 @@
     <button id="start">Запустить камеру</button>
     <button id="switchCam" class="secondary" style="display:none;">Переключить камеру</button>
     <div class="color-row">
-      <div class="color-btn" style="background:#e91e63" data-color="#e91e63" data-tex="pink"></div>
-      <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f" data-tex="red"></div>
-      <div class="color-btn" style="background:#212121" data-color="#212121" data-tex="black"></div>
-      <div class="color-btn" style="background:#ffffff" data-color="#ffffff" data-tex="white"></div>
-      <div class="color-btn" style="background:#ffc107" data-color="#ffc107" data-tex="gold"></div>
-      <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2" data-tex="purple"></div>
+      <div class="color-btn" style="background:#e91e63" data-color="#e91e63"></div>
+      <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f"></div>
+      <div class="color-btn" style="background:#212121" data-color="#212121"></div>
+      <div class="color-btn" style="background:#ffffff" data-color="#ffffff"></div>
+      <div class="color-btn" style="background:#ffc107" data-color="#ffc107"></div>
+      <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2"></div>
     </div>
   </div>
-  <div class="hint">Если текстур нет — рисуется цвет. Наложение по маске.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
@@ -53,8 +51,6 @@
     const colorBtns = document.querySelectorAll('.color-btn');
 
     let currentColor = '#e91e63';
-    let currentTexName = 'pink';
-    let textures = {};
     let session = null;
     let stream = null;
     let videoDevices = [];
@@ -62,13 +58,12 @@
     let running = false;
     const MODEL_SIZE = 192;
 
-    function setColor(color, texName) {
+    function setColor(color) {
       currentColor = color;
-      currentTexName = texName || 'pink';
       colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === color));
     }
-    colorBtns.forEach(btn => btn.addEventListener('click', () => setColor(btn.dataset.color, btn.dataset.tex)));
-    setColor(currentColor, 'pink');
+    colorBtns.forEach(btn => btn.addEventListener('click', () => setColor(btn.dataset.color)));
+    setColor(currentColor);
 
     function hexToRgb(hex) {
       return {
@@ -77,16 +72,6 @@
         b: parseInt(hex.slice(5,7),16)
       };
     }
-
-    function loadTextures() {
-      const names = ['pink','red','black','white','gold','purple'];
-      names.forEach(name => {
-        const img = new Image();
-        img.src = `textures/${name}.png`;
-        textures[name] = img;
-      });
-    }
-    loadTextures();
 
     async function loadModel() {
       statusEl.textContent = 'Загрузка U-Net модели...';
@@ -160,38 +145,6 @@
       requestAnimationFrame(processLoop);
     }
 
-    function findBlobs(mask, thresh = 0.45) {
-      const visited = new Uint8Array(MODEL_SIZE * MODEL_SIZE);
-      const blobs = [];
-      for (let y = 0; y < MODEL_SIZE; y++) {
-        for (let x = 0; x < MODEL_SIZE; x++) {
-          const i = y * MODEL_SIZE + x;
-          if (mask[i] > thresh && !visited[i]) {
-            const points = [];
-            const stack = [[x, y]];
-            let minX = x, maxX = x, minY = y, maxY = y;
-            let sumX = 0, sumY = 0;
-            while (stack.length) {
-              const [cx, cy] = stack.pop();
-              if (cx < 0 || cx >= MODEL_SIZE || cy < 0 || cy >= MODEL_SIZE) continue;
-              const ci = cy * MODEL_SIZE + cx;
-              if (visited[ci] || mask[ci] <= thresh) continue;
-              visited[ci] = 1;
-              points.push([cx, cy]);
-              sumX += cx; sumY += cy;
-              minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
-              minY = Math.min(minY, cy); maxY = Math.max(maxY, cy);
-              stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
-            }
-            if (points.length > 40) {
-              blobs.push({ minX, maxX, minY, maxY, cx: sumX/points.length, cy: sumY/points.length });
-            }
-          }
-        }
-      }
-      return blobs;
-    }
-
     async function segmentAndDraw() {
       const w = video.videoWidth;
       const h = video.videoHeight;
@@ -222,68 +175,39 @@
 
       ctx.drawImage(video, 0, 0, w, h);
 
-      const tex = textures[currentTexName];
-      const useTexture = tex && tex.complete && tex.naturalWidth > 0;
-      const blobs = findBlobs(mask, 0.45);
+      const imageData = ctx.getImageData(0, 0, w, h);
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
+      const rgb = hexToRgb(currentColor);
+      const THRESHOLD = 0.42;
 
-      const overlay = document.createElement('canvas');
-      overlay.width = w;
-      overlay.height = h;
-      const octx = overlay.getContext('2d');
-
-      for (const blob of blobs) {
-        const cx = blob.cx * scaleX;
-        const cy = blob.cy * scaleY;
-        const bw = (blob.maxX - blob.minX) * scaleX;
-        const bh = (blob.maxY - blob.minY) * scaleY;
-
-        octx.save();
-        octx.translate(cx, cy);
-        const aspect = bh / Math.max(bw, 1);
-        if (aspect > 1.3) octx.rotate(Math.PI / 2);
-
-        if (useTexture) {
-          const drawW = Math.max(bw * 1.1, bh * 0.7);
-          const drawH = Math.max(bh * 1.15, bw * 0.8);
-          octx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
-        } else {
-          octx.fillStyle = currentColor;
-          octx.beginPath();
-          const rw = Math.max(bw, bh * 0.6) * 0.55;
-          const rh = Math.max(bh, bw * 0.7) * 0.6;
-          octx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
-          octx.fill();
-        }
-        octx.restore();
-      }
-
-      const frame = ctx.getImageData(0, 0, w, h);
-      const ov = octx.getImageData(0, 0, w, h);
-      const out = ctx.createImageData(w, h);
-
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const mx = Math.min(MODEL_SIZE-1, Math.floor(x / scaleX));
-          const my = Math.min(MODEL_SIZE-1, Math.floor(y / scaleY));
-          const m = mask[my * MODEL_SIZE + mx];
-          const alpha = Math.max(0, Math.min(1, (m - 0.4) / 0.28));
-
-          const i = (y * w + x) * 4;
-          if (alpha > 0.04) {
-            out.data[i]   = frame.data[i]   * (1-alpha) + ov.data[i]   * alpha;
-            out.data[i+1] = frame.data[i+1] * (1-alpha) + ov.data[i+1] * alpha;
-            out.data[i+2] = frame.data[i+2] * (1-alpha) + ov.data[i+2] * alpha;
-          } else {
-            out.data[i] = frame.data[i];
-            out.data[i+1] = frame.data[i+1];
-            out.data[i+2] = frame.data[i+2];
+      let nailPixels = 0;
+      for (let y = 0; y < MODEL_SIZE; y++) {
+        for (let x = 0; x < MODEL_SIZE; x++) {
+          const m = mask[y * MODEL_SIZE + x];
+          if (m > THRESHOLD) {
+            nailPixels++;
+            const px = Math.floor(x * scaleX);
+            const py = Math.floor(y * scaleY);
+            const strength = Math.min(1, (m - THRESHOLD) / 0.35);
+            for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
+              for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
+                const i = ((py + dy) * w + (px + dx)) * 4;
+                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.75) + rgb.r * strength * 0.75;
+                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.75) + rgb.g * strength * 0.75;
+                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.75) + rgb.b * strength * 0.75;
+              }
+            }
           }
-          out.data[i+3] = 255;
         }
       }
-      ctx.putImageData(out, 0, 0);
+      ctx.putImageData(imageData, 0, 0);
+
+      if (nailPixels > 20) {
+        statusEl.textContent = 'Ногти найдены (' + nailPixels + ' px)';
+      } else {
+        statusEl.textContent = 'Ногти не найдены — покажи руку ближе';
+      }
     }
 
     switchBtn.addEventListener('click', () => startCamera(!useFront));
