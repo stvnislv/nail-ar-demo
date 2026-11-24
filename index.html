@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nail AR — U-Net Segmentation</title>
+  <title>Nail AR — U-Net</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <h1>Nail AR — U-Net Segmentation</h1>
+  <h1>Nail AR — U-Net</h1>
   <div class="status" id="status">Загрузка модели...</div>
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
@@ -43,7 +43,7 @@
       Свой цвет: <input type="color" id="customColor" value="#e91e63">
     </label>
   </div>
-  <div class="hint">Сегментация ногтей через обученный U-Net. Покажи руку.</div>
+  <div class="hint">Сегментация ногтей. Цвет накладывается точно по маске.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
@@ -182,29 +182,43 @@
 
       ctx.drawImage(video, 0, 0, w, h);
 
-      const rgb = hexToRgb(currentColor);
-      const imageData = ctx.getImageData(0, 0, w, h);
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = w;
+      maskCanvas.height = h;
+      const mctx = maskCanvas.getContext('2d');
+      const maskImg = mctx.createImageData(w, h);
+
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
+      const rgb = hexToRgb(currentColor);
 
       for (let y = 0; y < MODEL_SIZE; y++) {
         for (let x = 0; x < MODEL_SIZE; x++) {
           const m = mask[y * MODEL_SIZE + x];
-          if (m > 0.4) {
+          if (m > 0.35) {
             const px = Math.floor(x * scaleX);
             const py = Math.floor(y * scaleY);
+            const alpha = Math.min(1, (m - 0.35) / 0.4);
             for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
               for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
                 const i = ((py + dy) * w + (px + dx)) * 4;
-                imageData.data[i] = imageData.data[i] * 0.4 + rgb.r * 0.6;
-                imageData.data[i+1] = imageData.data[i+1] * 0.4 + rgb.g * 0.6;
-                imageData.data[i+2] = imageData.data[i+2] * 0.4 + rgb.b * 0.6;
+                maskImg.data[i] = rgb.r;
+                maskImg.data[i+1] = rgb.g;
+                maskImg.data[i+2] = rgb.b;
+                maskImg.data[i+3] = Math.floor(alpha * 180);
               }
             }
           }
         }
       }
-      ctx.putImageData(imageData, 0, 0);
+      mctx.putImageData(maskImg, 0, 0);
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(maskCanvas, 0, 0);
+
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.drawImage(maskCanvas, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
     }
 
     switchBtn.addEventListener('click', () => startCamera(!useFront));
