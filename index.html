@@ -6,77 +6,17 @@
   <title>Nail AR — Реалистичный прототип</title>
   <style>
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #0f0f0f;
-      color: #eee;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      padding: 12px;
-    }
+    body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
     h1 { margin: 8px 0; font-size: 1.3rem; text-align: center; }
-    .status {
-      margin: 6px 0 12px;
-      color: #aaa;
-      font-size: 0.9rem;
-      text-align: center;
-      min-height: 1.2em;
-    }
-    .container {
-      position: relative;
-      width: 100%;
-      max-width: 640px;
-      aspect-ratio: 3/4;
-      background: #000;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,.6);
-    }
-    video, canvas {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1);
-    }
+    .status { margin: 6px 0 12px; color: #aaa; font-size: 0.9rem; text-align: center; min-height: 1.2em; }
+    .container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 3/4; background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
     canvas { pointer-events: none; }
-    .controls {
-      margin-top: 16px;
-      width: 100%;
-      max-width: 640px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: center;
-    }
-    .color-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .color-btn {
-      width: 48px; height: 48px;
-      border-radius: 50%;
-      border: 3px solid #fff;
-      cursor: pointer;
-      transition: transform .12s;
-    }
+    .controls { margin-top: 16px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .color-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .color-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff; cursor: pointer; transition: transform .12s; }
     .color-btn:hover, .color-btn.active { transform: scale(1.15); }
-    button {
-      padding: 12px 24px;
-      font-size: 1rem;
-      border: none;
-      border-radius: 12px;
-      background: #e91e63;
-      color: white;
-      cursor: pointer;
-      font-weight: 600;
-    }
+    button { padding: 12px 24px; font-size: 1rem; border: none; border-radius: 12px; background: #e91e63; color: white; cursor: pointer; font-weight: 600; }
     button.secondary { background: #444; }
     .hint { font-size: 0.8rem; color: #888; text-align: center; margin-top: 8px; max-width: 500px; }
   </style>
@@ -84,12 +24,10 @@
 <body>
   <h1>Nail AR — Реалистичный прототип</h1>
   <div class="status" id="status">Нажми кнопку, чтобы запустить камеру</div>
-
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
   </div>
-
   <div class="controls">
     <button id="start">Запустить камеру</button>
     <button id="switchCam" class="secondary" style="display:none;">Переключить камеру</button>
@@ -109,7 +47,7 @@
       Свой цвет: <input type="color" id="customColor" value="#e91e63">
     </label>
   </div>
-  <div class="hint">Покажи руку. Цвет накладывается с бликом для более реалистичного вида. Лучше работает при хорошем свете.</div>
+  <div class="hint">Покажи руку. Цвет накладывается с бликом. Лучше при хорошем свете.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
@@ -130,15 +68,10 @@
     let hands;
     let camera;
     let facingMode = 'environment';
-    let stream;
+    let stream = null;
+    let videoDevices = [];
 
-    const FINGERS = [
-      { tip: 4,  dip: 3  },
-      { tip: 8,  dip: 7  },
-      { tip: 12, dip: 11 },
-      { tip: 16, dip: 15 },
-      { tip: 20, dip: 19 }
-    ];
+    const FINGERS = [{ tip: 4, dip: 3 }, { tip: 8, dip: 7 }, { tip: 12, dip: 11 }, { tip: 16, dip: 15 }, { tip: 20, dip: 19 }];
 
     function setColor(color) {
       currentColor = color;
@@ -155,33 +88,47 @@
       return {r,g,b};
     }
 
+    const textures = {};
+    const textureUrls = {
+      '#e91e63': 'nail-pink.jpg',
+      '#c2185b': 'nail-pink.jpg',
+      '#d32f2f': 'nail-red.jpg',
+      '#b71c1c': 'nail-red.jpg',
+      '#212121': 'nail-black.jpg'
+    };
+
+    function loadTextures() {
+      Object.values(textureUrls).forEach(url => {
+        if (!textures[url]) {
+          const img = new Image();
+          img.src = url;
+          textures[url] = img;
+        }
+      });
+    }
+    loadTextures();
+
     function drawNail(landmarks, tipIdx, dipIdx) {
       const tip = landmarks[tipIdx];
       const dip = landmarks[dipIdx];
       const w = canvas.width;
       const h = canvas.height;
-
       const tipX = (1 - tip.x) * w;
       const tipY = tip.y * h;
       const dipX = (1 - dip.x) * w;
       const dipY = dip.y * h;
-
       let dx = tipX - dipX;
       let dy = tipY - dipY;
       const len = Math.hypot(dx, dy) || 1;
       dx /= len; dy /= len;
-
       const nailLength = len * 0.55;
       const nailWidth  = len * 0.38;
-
       const baseX = dipX + dx * len * 0.62;
       const baseY = dipY + dy * len * 0.62;
       const endX  = tipX + dx * nailLength * 0.08;
       const endY  = tipY + dy * nailLength * 0.08;
-
       const px = -dy;
       const py = dx;
-
       const p1x = baseX + px * nailWidth * 0.5;
       const p1y = baseY + py * nailWidth * 0.5;
       const p2x = baseX - px * nailWidth * 0.5;
@@ -200,21 +147,34 @@
       ctx.closePath();
       ctx.clip();
 
-      const rgb = hexToRgb(currentColor);
-      const grad = ctx.createLinearGradient(baseX, baseY, endX, endY);
-      grad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`);
-      grad.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},0.82)`);
-      grad.addColorStop(1, `rgba(${Math.min(255,rgb.r+40)},${Math.min(255,rgb.g+40)},${Math.min(255,rgb.b+40)},0.9)`);
-      ctx.fillStyle = grad;
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fill();
-
-      ctx.globalCompositeOperation = 'screen';
-      ctx.beginPath();
-      ctx.ellipse(endX - dx*nailLength*0.25, endY - dy*nailLength*0.25, nailWidth*0.28, nailLength*0.18, Math.atan2(dy,dx), 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fill();
-
+      const texUrl = textureUrls[currentColor];
+      const tex = texUrl && textures[texUrl];
+      if (tex && tex.complete && tex.naturalWidth) {
+        const angle = Math.atan2(dy, dx);
+        const centerX = (baseX + endX) / 2;
+        const centerY = (baseY + endY) / 2;
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(angle);
+        const drawW = nailLength * 1.15;
+        const drawH = nailWidth * 1.1;
+        ctx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
+        ctx.restore();
+      } else {
+        const rgb = hexToRgb(currentColor);
+        const grad = ctx.createLinearGradient(baseX, baseY, endX, endY);
+        grad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`);
+        grad.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},0.82)`);
+        grad.addColorStop(1, `rgba(${Math.min(255,rgb.r+40)},${Math.min(255,rgb.g+40)},${Math.min(255,rgb.b+40)},0.9)`);
+        ctx.fillStyle = grad;
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.beginPath();
+        ctx.ellipse(endX - dx*nailLength*0.25, endY - dy*nailLength*0.25, nailWidth*0.28, nailLength*0.18, Math.atan2(dy,dx), 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fill();
+      }
       ctx.restore();
     }
 
@@ -223,7 +183,6 @@
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         for (const landmarks of results.multiHandLandmarks) {
           for (const finger of FINGERS) {
@@ -236,54 +195,52 @@
       }
     }
 
+    async function getCameras() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(d => d.kind === 'videoinput');
+      } catch (e) {}
+    }
+
     async function startCamera() {
       startBtn.disabled = true;
       statusEl.textContent = 'Запрашиваю камеру...';
       switchBtn.style.display = 'inline-block';
-
       try {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-
-        hands = new Hands({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-        hands.setOptions({
-          maxNumHands: 2,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.7,
-          minTrackingConfidence: 0.5
-        });
-        hands.onResults(onResults);
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+        if (camera) { try { camera.stop(); } catch(e) {} camera = null; }
+        await getCameras();
+        let videoConstraints = { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } };
+        if (videoDevices.length > 1) {
+          const rear = videoDevices.find(d => /back|rear|environment|задн/i.test(d.label || ''));
+          const front = videoDevices.find(d => /front|user|face|лиц/i.test(d.label || ''));
+          const target = facingMode === 'environment' ? rear : front;
+          if (target && target.deviceId) {
+            videoConstraints = { deviceId: { exact: target.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } };
           }
-        });
+        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
         video.srcObject = stream;
         await new Promise(r => { video.onloadedmetadata = r; });
         video.play();
-
-        if (camera) camera.stop();
-        camera = new Camera(video, {
-          onFrame: async () => await hands.send({ image: video }),
-          width: 1280,
-          height: 720
-        });
+        if (!hands) {
+          hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+          hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+          hands.onResults(onResults);
+        }
+        camera = new Camera(video, { onFrame: async () => await hands.send({ image: video }), width: 1280, height: 720 });
         camera.start();
-
         statusEl.textContent = facingMode === 'user' ? 'Передняя камера. Покажи руку.' : 'Задняя камера. Покажи руку.';
       } catch (err) {
+        console.error(err);
         statusEl.textContent = 'Ошибка камеры: ' + (err.message || err);
         startBtn.disabled = false;
       }
     }
 
-    switchBtn.addEventListener('click', () => {
+    switchBtn.addEventListener('click', async () => {
       facingMode = facingMode === 'user' ? 'environment' : 'user';
-      startCamera();
+      await startCamera();
     });
 
     startBtn.addEventListener('click', startCamera);
