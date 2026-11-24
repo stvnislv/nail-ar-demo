@@ -147,34 +147,54 @@
       ctx.closePath();
       ctx.clip();
 
+      const angle = Math.atan2(dy, dx);
+      const centerX = (baseX + endX) / 2;
+      const centerY = (baseY + endY) / 2;
+
       const texUrl = textureUrls[currentColor];
       const tex = texUrl && textures[texUrl];
+
       if (tex && tex.complete && tex.naturalWidth) {
-        const angle = Math.atan2(dy, dx);
-        const centerX = (baseX + endX) / 2;
-        const centerY = (baseY + endY) / 2;
         ctx.save();
         ctx.translate(centerX, centerY);
         ctx.rotate(angle);
         const drawW = nailLength * 1.15;
         const drawH = nailWidth * 1.1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
         ctx.restore();
       } else {
         const rgb = hexToRgb(currentColor);
-        const grad = ctx.createLinearGradient(baseX, baseY, endX, endY);
-        grad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`);
-        grad.addColorStop(0.6, `rgba(${rgb.r},${rgb.g},${rgb.b},0.82)`);
-        grad.addColorStop(1, `rgba(${Math.min(255,rgb.r+40)},${Math.min(255,rgb.g+40)},${Math.min(255,rgb.b+40)},0.9)`);
-        ctx.fillStyle = grad;
+
+        const baseGrad = ctx.createLinearGradient(baseX, baseY, endX, endY);
+        baseGrad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.45)`);
+        baseGrad.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},0.75)`);
+        baseGrad.addColorStop(1, `rgba(${Math.min(255, rgb.r+30)},${Math.min(255, rgb.g+30)},${Math.min(255, rgb.b+30)},0.85)`);
+        ctx.fillStyle = baseGrad;
         ctx.globalCompositeOperation = 'multiply';
         ctx.fill();
-        ctx.globalCompositeOperation = 'screen';
-        ctx.beginPath();
-        ctx.ellipse(endX - dx*nailLength*0.25, endY - dy*nailLength*0.25, nailWidth*0.28, nailLength*0.18, Math.atan2(dy,dx), 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+
+        ctx.globalCompositeOperation = 'soft-light';
+        const lightGrad = ctx.createLinearGradient(baseX - px*20, baseY - py*20, endX, endY);
+        lightGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
+        lightGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = lightGrad;
         ctx.fill();
+
+        ctx.globalCompositeOperation = 'screen';
+        ctx.save();
+        ctx.translate(endX - dx * nailLength * 0.22, endY - dy * nailLength * 0.22);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, nailWidth * 0.32, nailLength * 0.16, 0, 0, Math.PI * 2);
+        const highlight = ctx.createRadialGradient(0, 0, 0, 0, 0, nailWidth * 0.32);
+        highlight.addColorStop(0, 'rgba(255,255,255,0.55)');
+        highlight.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = highlight;
+        ctx.fill();
+        ctx.restore();
       }
+
       ctx.restore();
     }
 
