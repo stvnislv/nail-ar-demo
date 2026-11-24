@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nail AR — Прототип наложения цвета</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0f0f0f;
+      color: #eee;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+    h1 { margin: 8px 0; font-size: 1.3rem; text-align: center; }
+    .status {
+      margin: 6px 0 12px;
+      color: #aaa;
+      font-size: 0.9rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 3/4;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    }
+    video, canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    canvas { pointer-events: none; }
+    .controls {
+      margin-top: 16px;
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+    .color-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .color-btn {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      cursor: pointer;
+      transition: transform .12s;
+      box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    }
+    .color-btn:hover, .color-btn.active { transform: scale(1.12); }
+    input[type="color"] {
+      width: 52px; height: 52px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      background: none;
+      padding: 0;
+    }
+    button#start {
+      padding: 14px 32px;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 12px;
+      background: #e91e63;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button#start:disabled { background: #444; cursor: default; }
+    .hint { font-size: 0.8rem; color: #888; text-align: center; margin-top: 8px; max-width: 500px; }
+  </style>
+</head>
+<body>
+  <h1>Nail AR — Цвет на ногтях</h1>
+  <div class="status" id="status">Нажми кнопку, чтобы запустить камеру</div>
+
+  <div class="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="start">Запустить камеру</button>
+    <div class="color-row">
+      <div class="color-btn" style="background:#e91e63" data-color="#e91e63" title="Розовый"></div>
+      <div class="color-btn" style="background:#c2185b" data-color="#c2185b" title="Малиновый"></div>
+      <div class="color-btn" style="background:#d32f2f" data-color="#d32f2f" title="Красный"></div>
+      <div class="color-btn" style="background:#b71c1c" data-color="#b71c1c" title="Тёмно-красный"></div>
+      <div class="color-btn" style="background:#212121" data-color="#212121" title="Чёрный"></div>
+      <div class="color-btn" style="background:#ffffff" data-color="#ffffff" title="Белый"></div>
+      <div class="color-btn" style="background:#ffc107" data-color="#ffc107" title="Жёлтый"></div>
+      <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2" title="Фиолетовый"></div>
+      <div class="color-btn" style="background:#1976d2" data-color="#1976d2" title="Синий"></div>
+      <div class="color-btn" style="background:#00796b" data-color="#00796b" title="Бирюзовый"></div>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px;">
+      Свой цвет:
+      <input type="color" id="customColor" value="#e91e63">
+    </label>
+  </div>
+  <div class="hint">Покажи руку в камеру. Цвет накладывается на все ногти в реальном времени. Работает лучше при хорошем освещении.</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const startBtn = document.getElementById('start');
+    const colorBtns = document.querySelectorAll('.color-btn');
+    const customColor = document.getElementById('customColor');
+
+    let currentColor = '#e91e63';
+    let hands;
+    let camera;
+
+    const FINGERS = [
+      { tip: 4,  dip: 3  },
+      { tip: 8,  dip: 7  },
+      { tip: 12, dip: 11 },
+      { tip: 16, dip: 15 },
+      { tip: 20, dip: 19 }
+    ];
+
+    function setColor(color) {
+      currentColor = color;
+      colorBtns.forEach(b => b.classList.toggle('active', b.dataset.color === color));
+    }
+
+    colorBtns.forEach(btn => {
+      btn.addEventListener('click', () => setColor(btn.dataset.color));
+    });
+    customColor.addEventListener('input', e => setColor(e.target.value));
+    setColor(currentColor);
+
+    function drawNail(landmarks, tipIdx, dipIdx) {
+      const tip = landmarks[tipIdx];
+      const dip = landmarks[dipIdx];
+
+      const w = canvas.width;
+      const h = canvas.height;
+
+      const tipX = (1 - tip.x) * w;
+      const tipY = tip.y * h;
+      const dipX = (1 - dip.x) * w;
+      const dipY = dip.y * h;
+
+      let dx = tipX - dipX;
+      let dy = tipY - dipY;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+
+      // Улучшенные пропорции ногтя
+      const nailLength = len * 0.72;
+      const nailWidth  = len * 0.48;
+
+      const baseX = dipX + dx * len * 0.42;
+      const baseY = dipY + dy * len * 0.42;
+      const endX  = tipX + dx * nailLength * 0.18;
+      const endY  = tipY + dy * nailLength * 0.18;
+
+      const px = -dy;
+      const py = dx;
+
+      const p1x = baseX + px * nailWidth * 0.5;
+      const p1y = baseY + py * nailWidth * 0.5;
+      const p2x = baseX - px * nailWidth * 0.5;
+      const p2y = baseY - py * nailWidth * 0.5;
+      const p3x = endX  - px * nailWidth * 0.38;
+      const p3y = endY  - py * nailWidth * 0.38;
+      const p4x = endX  + px * nailWidth * 0.38;
+      const p4y = endY  + py * nailWidth * 0.38;
+
+      ctx.beginPath();
+      ctx.moveTo(p1x, p1y);
+      ctx.quadraticCurveTo(baseX + px * nailWidth * 0.2, baseY + py * nailWidth * 0.2, p2x, p2y);
+      ctx.lineTo(p3x, p3y);
+      ctx.quadraticCurveTo(endX, endY + 4, p4x, p4y);
+      ctx.closePath();
+
+      ctx.fillStyle = currentColor;
+      ctx.globalAlpha = 0.78;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    function onResults(results) {
+      if (!video.videoWidth) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (const landmarks of results.multiHandLandmarks) {
+          for (const finger of FINGERS) {
+            drawNail(landmarks, finger.tip, finger.dip);
+          }
+        }
+        statusEl.textContent = 'Рука обнаружена — цвет наложен';
+      } else {
+        statusEl.textContent = 'Покажи руку в камеру';
+      }
+    }
+
+    async function startCamera() {
+      startBtn.disabled = true;
+      statusEl.textContent = 'Запрашиваю камеру...';
+
+      try {
+        hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.65,
+          minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onResults);
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+        video.srcObject = stream;
+
+        await new Promise(r => { video.onloadedmetadata = r; });
+        video.play();
+
+        camera = new Camera(video, {
+          onFrame: async () => {
+            await hands.send({ image: video });
+          },
+          width: 1280,
+          height: 720
+        });
+        camera.start();
+
+        statusEl.textContent = 'Камера работает. Покажи руку.';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Ошибка камеры: ' + (err.message || err);
+        startBtn.disabled = false;
+      }
+    }
+
+    startBtn.addEventListener('click', startCamera);
+  </script>
+</body>
+</html>
