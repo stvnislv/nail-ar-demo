@@ -43,7 +43,7 @@
       Свой цвет: <input type="color" id="customColor" value="#e91e63">
     </label>
   </div>
-  <div class="hint">Сегментация ногтей. Цвет накладывается точно по маске.</div>
+  <div class="hint">Сегментация ногтей. Цвет только по уверенной маске.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
@@ -182,43 +182,31 @@
 
       ctx.drawImage(video, 0, 0, w, h);
 
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = w;
-      maskCanvas.height = h;
-      const mctx = maskCanvas.getContext('2d');
-      const maskImg = mctx.createImageData(w, h);
-
+      const imageData = ctx.getImageData(0, 0, w, h);
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
       const rgb = hexToRgb(currentColor);
+      const THRESHOLD = 0.55;
 
       for (let y = 0; y < MODEL_SIZE; y++) {
         for (let x = 0; x < MODEL_SIZE; x++) {
           const m = mask[y * MODEL_SIZE + x];
-          if (m > 0.35) {
+          if (m > THRESHOLD) {
             const px = Math.floor(x * scaleX);
             const py = Math.floor(y * scaleY);
-            const alpha = Math.min(1, (m - 0.35) / 0.4);
+            const strength = Math.min(1, (m - THRESHOLD) / 0.3);
             for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
               for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
                 const i = ((py + dy) * w + (px + dx)) * 4;
-                maskImg.data[i] = rgb.r;
-                maskImg.data[i+1] = rgb.g;
-                maskImg.data[i+2] = rgb.b;
-                maskImg.data[i+3] = Math.floor(alpha * 180);
+                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.7) + rgb.r * strength * 0.7;
+                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.7) + rgb.g * strength * 0.7;
+                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.7) + rgb.b * strength * 0.7;
               }
             }
           }
         }
       }
-      mctx.putImageData(maskImg, 0, 0);
-
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(maskCanvas, 0, 0);
-
-      ctx.globalCompositeOperation = 'soft-light';
-      ctx.drawImage(maskCanvas, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
+      ctx.putImageData(imageData, 0, 0);
     }
 
     switchBtn.addEventListener('click', () => startCamera(!useFront));
