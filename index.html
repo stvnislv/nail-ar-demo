@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nail AR — Реалистичный прототип</title>
+  <title>Nail AR — Прототип</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
     h1 { margin: 8px 0; font-size: 1.3rem; text-align: center; }
     .status { margin: 6px 0 12px; color: #aaa; font-size: 0.9rem; text-align: center; min-height: 1.2em; }
     .container { position: relative; width: 100%; max-width: 640px; aspect-ratio: 3/4; background: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
-    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
     canvas { pointer-events: none; }
     .controls { margin-top: 16px; width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
     .color-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <h1>Nail AR — Реалистичный прототип</h1>
+  <h1>Nail AR — Прототип</h1>
   <div class="status" id="status">Нажми кнопку, чтобы запустить камеру</div>
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
@@ -47,7 +47,7 @@
       Свой цвет: <input type="color" id="customColor" value="#e91e63">
     </label>
   </div>
-  <div class="hint">Покажи руку. Цвет накладывается с бликом. Лучше при хорошем свете.</div>
+  <div class="hint">Покажи руку. Лучше при хорошем свете.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
@@ -66,10 +66,10 @@
 
     let currentColor = '#e91e63';
     let hands;
-    let camera;
-    let facingMode = 'environment';
     let stream = null;
     let videoDevices = [];
+    let currentDeviceId = null;
+    let useFront = false;
 
     const FINGERS = [{ tip: 4, dip: 3 }, { tip: 8, dip: 7 }, { tip: 12, dip: 11 }, { tip: 16, dip: 15 }, { tip: 20, dip: 19 }];
 
@@ -88,34 +88,14 @@
       return {r,g,b};
     }
 
-    const textures = {};
-    const textureUrls = {
-      '#e91e63': 'nail-pink.jpg',
-      '#c2185b': 'nail-pink.jpg',
-      '#d32f2f': 'nail-red.jpg',
-      '#b71c1c': 'nail-red.jpg',
-      '#212121': 'nail-black.jpg'
-    };
-
-    function loadTextures() {
-      Object.values(textureUrls).forEach(url => {
-        if (!textures[url]) {
-          const img = new Image();
-          img.src = url;
-          textures[url] = img;
-        }
-      });
-    }
-    loadTextures();
-
     function drawNail(landmarks, tipIdx, dipIdx) {
       const tip = landmarks[tipIdx];
       const dip = landmarks[dipIdx];
       const w = canvas.width;
       const h = canvas.height;
-      const tipX = (1 - tip.x) * w;
+      const tipX = tip.x * w;
       const tipY = tip.y * h;
-      const dipX = (1 - dip.x) * w;
+      const dipX = dip.x * w;
       const dipY = dip.y * h;
       let dx = tipX - dipX;
       let dy = tipY - dipY;
@@ -147,53 +127,21 @@
       ctx.closePath();
       ctx.clip();
 
-      const angle = Math.atan2(dy, dx);
-      const centerX = (baseX + endX) / 2;
-      const centerY = (baseY + endY) / 2;
+      const rgb = hexToRgb(currentColor);
+      const baseGrad = ctx.createLinearGradient(baseX, baseY, endX, endY);
+      baseGrad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`);
+      baseGrad.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},0.8)`);
+      baseGrad.addColorStop(1, `rgba(${Math.min(255, rgb.r+40)},${Math.min(255, rgb.g+40)},${Math.min(255, rgb.b+40)},0.9)`);
+      ctx.fillStyle = baseGrad;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fill();
 
-      const texUrl = textureUrls[currentColor];
-      const tex = texUrl && textures[texUrl];
-
-      if (tex && tex.complete && tex.naturalWidth) {
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(angle);
-        const drawW = nailLength * 1.15;
-        const drawH = nailWidth * 1.1;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
-        ctx.restore();
-      } else {
-        const rgb = hexToRgb(currentColor);
-
-        const baseGrad = ctx.createLinearGradient(baseX, baseY, endX, endY);
-        baseGrad.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},0.45)`);
-        baseGrad.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},0.75)`);
-        baseGrad.addColorStop(1, `rgba(${Math.min(255, rgb.r+30)},${Math.min(255, rgb.g+30)},${Math.min(255, rgb.b+30)},0.85)`);
-        ctx.fillStyle = baseGrad;
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.fill();
-
-        ctx.globalCompositeOperation = 'soft-light';
-        const lightGrad = ctx.createLinearGradient(baseX - px*20, baseY - py*20, endX, endY);
-        lightGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
-        lightGrad.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = lightGrad;
-        ctx.fill();
-
-        ctx.globalCompositeOperation = 'screen';
-        ctx.save();
-        ctx.translate(endX - dx * nailLength * 0.22, endY - dy * nailLength * 0.22);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, nailWidth * 0.32, nailLength * 0.16, 0, 0, Math.PI * 2);
-        const highlight = ctx.createRadialGradient(0, 0, 0, 0, 0, nailWidth * 0.32);
-        highlight.addColorStop(0, 'rgba(255,255,255,0.55)');
-        highlight.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = highlight;
-        ctx.fill();
-        ctx.restore();
-      }
+      ctx.globalCompositeOperation = 'soft-light';
+      const lightGrad = ctx.createLinearGradient(baseX - px*20, baseY - py*20, endX, endY);
+      lightGrad.addColorStop(0, 'rgba(255,255,255,0.3)');
+      lightGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = lightGrad;
+      ctx.fill();
 
       ctx.restore();
     }
@@ -217,40 +165,70 @@
 
     async function getCameras() {
       try {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(t => t.stop());
         const devices = await navigator.mediaDevices.enumerateDevices();
         videoDevices = devices.filter(d => d.kind === 'videoinput');
-      } catch (e) {}
+        console.log('Cameras:', videoDevices.map(d => ({label: d.label, id: d.deviceId})));
+      } catch (e) {
+        console.error('getCameras error', e);
+      }
     }
 
-    async function startCamera() {
+    function findDevice(preferFront) {
+      if (!videoDevices.length) return null;
+      const front = videoDevices.find(d => /front|user|face|лиц|selfie/i.test(d.label || ''));
+      const rear = videoDevices.find(d => /back|rear|environment|задн|wide/i.test(d.label || ''));
+      if (preferFront) return front || videoDevices[0];
+      return rear || videoDevices[videoDevices.length - 1] || videoDevices[0];
+    }
+
+    async function startCamera(preferFront = false) {
       startBtn.disabled = true;
       statusEl.textContent = 'Запрашиваю камеру...';
       switchBtn.style.display = 'inline-block';
+      useFront = preferFront;
+
       try {
-        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-        if (camera) { try { camera.stop(); } catch(e) {} camera = null; }
-        await getCameras();
-        let videoConstraints = { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } };
-        if (videoDevices.length > 1) {
-          const rear = videoDevices.find(d => /back|rear|environment|задн/i.test(d.label || ''));
-          const front = videoDevices.find(d => /front|user|face|лиц/i.test(d.label || ''));
-          const target = facingMode === 'environment' ? rear : front;
-          if (target && target.deviceId) {
-            videoConstraints = { deviceId: { exact: target.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } };
-          }
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
         }
-        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+        if (!videoDevices.length) await getCameras();
+
+        const device = findDevice(preferFront);
+        let constraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: preferFront ? 'user' : 'environment'
+          }
+        };
+        if (device && device.deviceId) {
+          constraints.video.deviceId = { exact: device.deviceId };
+          currentDeviceId = device.deviceId;
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         await new Promise(r => { video.onloadedmetadata = r; });
-        video.play();
+        await video.play();
+
         if (!hands) {
           hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
           hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
           hands.onResults(onResults);
         }
-        camera = new Camera(video, { onFrame: async () => await hands.send({ image: video }), width: 1280, height: 720 });
-        camera.start();
-        statusEl.textContent = facingMode === 'user' ? 'Передняя камера. Покажи руку.' : 'Задняя камера. Покажи руку.';
+
+        const process = async () => {
+          if (video.readyState >= 2 && stream && stream.active) {
+            await hands.send({ image: video });
+          }
+          requestAnimationFrame(process);
+        };
+        process();
+
+        statusEl.textContent = preferFront ? 'Передняя камера. Покажи руку.' : 'Задняя камера. Покажи руку.';
       } catch (err) {
         console.error(err);
         statusEl.textContent = 'Ошибка камеры: ' + (err.message || err);
@@ -258,12 +236,11 @@
       }
     }
 
-    switchBtn.addEventListener('click', async () => {
-      facingMode = facingMode === 'user' ? 'environment' : 'user';
-      await startCamera();
+    switchBtn.addEventListener('click', () => {
+      startCamera(!useFront);
     });
 
-    startBtn.addEventListener('click', startCamera);
+    startBtn.addEventListener('click', () => startCamera(false));
   </script>
 </body>
 </html>
