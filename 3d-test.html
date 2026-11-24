@@ -81,11 +81,12 @@
       renderer.setClearColor(0x000000, 0);
 
       scene = new THREE.Scene();
-      camera3d = new THREE.PerspectiveCamera(50, w/h, 0.1, 10);
+      const aspect = w / h;
+      camera3d = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
       camera3d.position.z = 2;
 
       const geo = new THREE.SphereGeometry(0.12, 32, 16);
-      geo.scale(1.6, 0.55, 0.35);
+      geo.scale(0.9, 0.35, 0.25);
       const mat = new THREE.MeshStandardMaterial({
         color: 0xe91e63,
         roughness: 0.25,
@@ -136,14 +137,15 @@
         const tip = lm[8];
         const dip = lm[7];
 
-        const nx = (tip.x - 0.5) * 2;
+        const aspect = canvas.width / canvas.height;
+        const nx = (tip.x - 0.5) * 2 * aspect;
         const ny = -(tip.y - 0.5) * 2;
         const dx = tip.x - dip.x;
         const dy = tip.y - dip.y;
         const angle = Math.atan2(dy, dx);
 
-        nailTarget.x = nx * 0.9;
-        nailTarget.y = ny * 0.9;
+        nailTarget.x = nx;
+        nailTarget.y = ny;
         nailTarget.rz = -angle;
 
         statusEl.textContent = '3D ноготь на указательном';
@@ -192,7 +194,11 @@
         canvas.height = rect.height;
         if (renderer) renderer.setSize(rect.width, rect.height);
         if (camera3d) {
-          camera3d.aspect = rect.width / rect.height;
+          const aspect = rect.width / rect.height;
+          camera3d.left = -aspect;
+          camera3d.right = aspect;
+          camera3d.top = 1;
+          camera3d.bottom = -1;
           camera3d.updateProjectionMatrix();
         }
 
