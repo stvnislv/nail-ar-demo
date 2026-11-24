@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nail AR — Textures</title>
+  <title>Nail AR — Textures + Soft Mask</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #0f0f0f; color: #eee; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 12px; }
@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <h1>Nail AR — Textures</h1>
+  <h1>Nail AR — Textures + Soft Mask</h1>
   <div class="status" id="status">Загрузка модели...</div>
   <div class="container">
     <video id="video" autoplay playsinline muted></video>
@@ -40,7 +40,7 @@
       <div class="color-btn" style="background:#7b1fa2" data-color="purple"></div>
     </div>
   </div>
-  <div class="hint">Текстуры ногтей накладываются по маске сегментации.</div>
+  <div class="hint">Текстуры + мягкая маска. Наложение по форме ногтя.</div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
   <script>
@@ -150,7 +150,7 @@
       requestAnimationFrame(processLoop);
     }
 
-    function findBlobs(mask, thresh = 0.5) {
+    function findBlobs(mask, thresh = 0.48) {
       const visited = new Uint8Array(MODEL_SIZE * MODEL_SIZE);
       const blobs = [];
       for (let y = 0; y < MODEL_SIZE; y++) {
@@ -160,19 +160,26 @@
             const points = [];
             const stack = [[x, y]];
             let minX = x, maxX = x, minY = y, maxY = y;
+            let sumX = 0, sumY = 0;
             while (stack.length) {
               const [cx, cy] = stack.pop();
               if (cx < 0 || cx >= MODEL_SIZE || cy < 0 || cy >= MODEL_SIZE) continue;
               const ci = cy * MODEL_SIZE + cx;
               if (visited[ci] || mask[ci] <= thresh) continue;
               visited[ci] = 1;
-              points.push([cx, cy]);
+              points.push([cx, cy, mask[ci]]);
+              sumX += cx; sumY += cy;
               minX = Math.min(minX, cx); maxX = Math.max(maxX, cx);
               minY = Math.min(minY, cy); maxY = Math.max(maxY, cy);
               stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
             }
-            if (points.length > 40) {
-              blobs.push({ minX, maxX, minY, maxY, points });
+            if (points.length > 50) {
+              blobs.push({
+                minX, maxX, minY, maxY,
+                cx: sumX / points.length,
+                cy: sumY / points.length,
+                points
+              });
             }
           }
         }
@@ -211,29 +218,63 @@
       ctx.drawImage(video, 0, 0, w, h);
 
       const tex = textures[currentTexture];
-      if (!tex || !tex.complete) return;
+      if (!tex || !tex.complete || !tex.naturalWidth) return;
 
-      const blobs = findBlobs(mask, 0.5);
+      const blobs = findBlobs(mask, 0.48);
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
 
+      const texCanvas = document.createElement('canvas');
+      texCanvas.width = w;
+      texCanvas.height = h;
+      const tCtx = texCanvas.getContext('2d');
+
       for (const blob of blobs) {
-        const cx = ((blob.minX + blob.maxX) / 2) * scaleX;
-        const cy = ((blob.minY + blob.maxY) / 2) * scaleY;
+        const cx = blob.cx * scaleX;
+        const cy = blob.cy * scaleY;
         const bw = (blob.maxX - blob.minX) * scaleX;
         const bh = (blob.maxY - blob.minY) * scaleY;
 
         let angle = 0;
-        if (bh > bw * 1.2) angle = Math.PI / 2;
+        const aspect = bh / Math.max(bw, 1);
+        if (aspect > 1.4) angle = Math.PI / 2;
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        const drawW = Math.max(bw, bh * 0.7) * 1.1;
-        const drawH = Math.max(bh, bw * 0.8) * 1.15;
-        ctx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
-        ctx.restore();
+        tCtx.save();
+        tCtx.translate(cx, cy);
+        tCtx.rotate(angle);
+        const drawW = Math.max(bw * 1.05, bh * 0.65);
+        const drawH = Math.max(bh * 1.1, bw * 0.75);
+        tCtx.drawImage(tex, -drawW/2, -drawH/2, drawW, drawH);
+        tCtx.restore();
       }
+
+      const frame = ctx.getImageData(0, 0, w, h);
+      const texData = tCtx.getImageData(0, 0, w, h);
+      const out = ctx.createImageData(w, h);
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const mx = Math.min(MODEL_SIZE - 1, Math.floor(x / scaleX));
+          const my = Math.min(MODEL_SIZE - 1, Math.floor(y / scaleY));
+          const m = mask[my * MODEL_SIZE + mx];
+
+          const alpha = Math.max(0, Math.min(1, (m - 0.42) / 0.25));
+
+          const i = (y * w + x) * 4;
+          if (alpha > 0.05) {
+            out.data[i]   = frame.data[i]   * (1 - alpha) + texData.data[i]   * alpha;
+            out.data[i+1] = frame.data[i+1] * (1 - alpha) + texData.data[i+1] * alpha;
+            out.data[i+2] = frame.data[i+2] * (1 - alpha) + texData.data[i+2] * alpha;
+            out.data[i+3] = 255;
+          } else {
+            out.data[i] = frame.data[i];
+            out.data[i+1] = frame.data[i+1];
+            out.data[i+2] = frame.data[i+2];
+            out.data[i+3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(out, 0, 0);
     }
 
     switchBtn.addEventListener('click', () => startCamera(!useFront));
