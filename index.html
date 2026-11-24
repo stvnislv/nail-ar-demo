@@ -129,7 +129,7 @@
     let currentColor = '#e91e63';
     let hands;
     let camera;
-    let facingMode = 'user';
+    let facingMode = 'environment';
     let stream;
 
     const FINGERS = [
@@ -171,25 +171,25 @@
       const len = Math.hypot(dx, dy) || 1;
       dx /= len; dy /= len;
 
-      const nailLength = len * 0.68;
-      const nailWidth  = len * 0.42;
+      const nailLength = len * 0.55;
+      const nailWidth  = len * 0.38;
 
-      const baseX = dipX + dx * len * 0.48;
-      const baseY = dipY + dy * len * 0.48;
-      const endX  = tipX + dx * nailLength * 0.12;
-      const endY  = tipY + dy * nailLength * 0.12;
+      const baseX = dipX + dx * len * 0.62;
+      const baseY = dipY + dy * len * 0.62;
+      const endX  = tipX + dx * nailLength * 0.08;
+      const endY  = tipY + dy * nailLength * 0.08;
 
       const px = -dy;
       const py = dx;
 
-      const p1x = baseX + px * nailWidth * 0.55;
-      const p1y = baseY + py * nailWidth * 0.55;
-      const p2x = baseX - px * nailWidth * 0.55;
-      const p2y = baseY - py * nailWidth * 0.55;
-      const p3x = endX  - px * nailWidth * 0.32;
-      const p3y = endY  - py * nailWidth * 0.32;
-      const p4x = endX  + px * nailWidth * 0.32;
-      const p4y = endY  + py * nailWidth * 0.32;
+      const p1x = baseX + px * nailWidth * 0.5;
+      const p1y = baseY + py * nailWidth * 0.5;
+      const p2x = baseX - px * nailWidth * 0.5;
+      const p2y = baseY - py * nailWidth * 0.5;
+      const p3x = endX  - px * nailWidth * 0.28;
+      const p3y = endY  - py * nailWidth * 0.28;
+      const p4x = endX  + px * nailWidth * 0.28;
+      const p4y = endY  + py * nailWidth * 0.28;
 
       ctx.save();
       ctx.beginPath();
