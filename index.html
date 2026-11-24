@@ -116,6 +116,23 @@
       box-shadow: 0 8px 28px rgba(0,0,0,.45), 0 0 0 3px rgba(255,255,255,.5);
     }
     .back-btn { margin-top: 8px; }
+    .finish-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .finish-btn {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      cursor: pointer;
+    }
+    .finish-btn.active {
+      background: rgba(255,255,255,.3);
+    }
   </style>
 </head>
 <body>
@@ -141,6 +158,11 @@
         <div class="color-btn" style="background:#ffc107" data-color="#ffc107"></div>
         <div class="color-btn" style="background:#7b1fa2" data-color="#7b1fa2"></div>
       </div>
+      <div class="finish-row">
+        <button class="finish-btn active" data-finish="gloss">Глянец</button>
+        <button class="finish-btn" data-finish="matte">Мат</button>
+        <button class="finish-btn" data-finish="sheer">Полупрозрачный</button>
+      </div>
       <button id="backBtn" class="glass-btn secondary back-btn">Назад</button>
     </div>
   </div>
@@ -153,18 +175,29 @@
     const backBtn = document.getElementById('backBtn');
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const statusEl = document.getElementById('status');
     const switchBtn = document.getElementById('switchCam');
     const colorBtns = document.querySelectorAll('.color-btn');
+    const finishBtns = document.querySelectorAll('.finish-btn');
 
     let currentColor = '#e91e63';
+    let currentFinish = 'gloss';
     let session = null;
     let stream = null;
     let videoDevices = [];
     let useFront = false;
     let running = false;
-    const MODEL_SIZE = 128;
+    const MODEL_SIZE = 192;
+    let prevMask = null;
+    let frameCount = 0;
+    const INFERENCE_EVERY = 2;
+
+    let inputBuffer = new Float32Array(MODEL_SIZE * MODEL_SIZE * 3);
+    let tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = MODEL_SIZE;
+    tmpCanvas.height = MODEL_SIZE;
+    let tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
 
     function setColor(color) {
       currentColor = color;
@@ -172,6 +205,11 @@
     }
     colorBtns.forEach(btn => btn.addEventListener('click', () => setColor(btn.dataset.color)));
     setColor(currentColor);
+
+    finishBtns.forEach(btn => btn.addEventListener('click', () => {
+      currentFinish = btn.dataset.finish;
+      finishBtns.forEach(b => b.classList.toggle('active', b === btn));
+    }));
 
     function hexToRgb(hex) {
       return {
@@ -214,6 +252,7 @@
       statusEl.textContent = 'Запуск камеры...';
       useFront = preferFront;
       running = true;
+      prevMask = null;
 
       try {
         if (stream) stream.getTracks().forEach(t => t.stop());
@@ -248,6 +287,7 @@
         stream = null;
       }
       video.srcObject = null;
+      prevMask = null;
     }
 
     async function processLoop() {
@@ -258,6 +298,86 @@
       requestAnimationFrame(processLoop);
     }
 
+    function prepareInput() {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const scale = Math.max(MODEL_SIZE / vw, MODEL_SIZE / vh);
+      const sw = vw * scale;
+      const sh = vh * scale;
+      const sx = (sw - MODEL_SIZE) / 2;
+      const sy = (sh - MODEL_SIZE) / 2;
+
+      tmpCtx.drawImage(video, -sx / scale, -sy / scale, vw, vh);
+      const imgData = tmpCtx.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE);
+      const data = imgData.data;
+
+      for (let i = 0, p = 0; i < data.length; i += 4, p += 3) {
+        inputBuffer[p]     = data[i]     / 255;
+        inputBuffer[p + 1] = data[i + 1] / 255;
+        inputBuffer[p + 2] = data[i + 2] / 255;
+      }
+      return inputBuffer;
+    }
+
+    function smoothMask(newMask) {
+      if (!prevMask) {
+        prevMask = new Float32Array(newMask);
+        return prevMask;
+      }
+      const alpha = 0.6;
+      for (let i = 0; i < newMask.length; i++) {
+        prevMask[i] = prevMask[i] * (1 - alpha) + newMask[i] * alpha;
+      }
+      return prevMask;
+    }
+
+    function applyPolish(imageData, mask, w, h, rgb, finish) {
+      const data = imageData.data;
+      const scaleX = w / MODEL_SIZE;
+      const scaleY = h / MODEL_SIZE;
+      const THRESHOLD = 0.45;
+
+      for (let y = 0; y < MODEL_SIZE; y++) {
+        for (let x = 0; x < MODEL_SIZE; x++) {
+          const m = mask[y * MODEL_SIZE + x];
+          if (m < THRESHOLD) continue;
+
+          const strength = Math.min(1, (m - THRESHOLD) / 0.35);
+          const px = Math.floor(x * scaleX);
+          const py = Math.floor(y * scaleY);
+
+          for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
+            for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
+              const i = ((py + dy) * w + (px + dx)) * 4;
+              const r = data[i], g = data[i+1], b = data[i+2];
+
+              const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+              const highlight = Math.max(0, (lum - 180) / 75);
+
+              let mix = strength;
+              if (finish === 'sheer') mix *= 0.55;
+              if (finish === 'matte') mix *= 0.85;
+
+              let nr = r * (1 - mix) + rgb.r * mix;
+              let ng = g * (1 - mix) + rgb.g * mix;
+              let nb = b * (1 - mix) + rgb.b * mix;
+
+              if (finish === 'gloss' && highlight > 0.1) {
+                const hStr = highlight * strength * 0.7;
+                nr = nr * (1 - hStr) + 255 * hStr;
+                ng = ng * (1 - hStr) + 255 * hStr;
+                nb = nb * (1 - hStr) + 255 * hStr;
+              }
+
+              data[i]   = nr;
+              data[i+1] = ng;
+              data[i+2] = nb;
+            }
+          }
+        }
+      }
+    }
+
     async function segmentAndDraw() {
       const w = video.videoWidth;
       const h = video.videoHeight;
@@ -266,52 +386,21 @@
       canvas.width = w;
       canvas.height = h;
 
-      const tmp = document.createElement('canvas');
-      tmp.width = MODEL_SIZE;
-      tmp.height = MODEL_SIZE;
-      const tctx = tmp.getContext('2d');
-      tctx.drawImage(video, 0, 0, MODEL_SIZE, MODEL_SIZE);
-      const imgData = tctx.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE);
+      frameCount++;
+      let mask = prevMask;
 
-      const input = new Float32Array(MODEL_SIZE * MODEL_SIZE * 3);
-      for (let i = 0; i < imgData.data.length; i += 4) {
-        const idx = i / 4;
-        input[idx] = imgData.data[i] / 255;
-        input[idx + MODEL_SIZE * MODEL_SIZE] = imgData.data[i+1] / 255;
-        input[idx + 2 * MODEL_SIZE * MODEL_SIZE] = imgData.data[i+2] / 255;
+      if (frameCount % INFERENCE_EVERY === 0 || !prevMask) {
+        const input = prepareInput();
+        const tensor = new ort.Tensor('float32', input, [1, MODEL_SIZE, MODEL_SIZE, 3]);
+        const results = await session.run({ input: tensor });
+        const rawMask = results[Object.keys(results)[0]].data;
+        mask = smoothMask(rawMask);
       }
-
-      const tensor = new ort.Tensor('float32', input, [1, MODEL_SIZE, MODEL_SIZE, 3]);
-      const feeds = { input: tensor };
-      const results = await session.run(feeds);
-      const mask = results[Object.keys(results)[0]].data;
 
       ctx.drawImage(video, 0, 0, w, h);
-
       const imageData = ctx.getImageData(0, 0, w, h);
-      const scaleX = w / MODEL_SIZE;
-      const scaleY = h / MODEL_SIZE;
       const rgb = hexToRgb(currentColor);
-      const THRESHOLD = 0.55;
-
-      for (let y = 0; y < MODEL_SIZE; y++) {
-        for (let x = 0; x < MODEL_SIZE; x++) {
-          const m = mask[y * MODEL_SIZE + x];
-          if (m > THRESHOLD) {
-            const px = Math.floor(x * scaleX);
-            const py = Math.floor(y * scaleY);
-            const strength = Math.min(1, (m - THRESHOLD) / 0.3);
-            for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
-              for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
-                const i = ((py + dy) * w + (px + dx)) * 4;
-                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.8) + rgb.r * strength * 0.8;
-                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.8) + rgb.g * strength * 0.8;
-                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.8) + rgb.b * strength * 0.8;
-              }
-            }
-          }
-        }
-      }
+      applyPolish(imageData, mask, w, h, rgb, currentFinish);
       ctx.putImageData(imageData, 0, 0);
     }
 
