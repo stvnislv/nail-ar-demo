@@ -179,7 +179,7 @@
       const scaleX = w / MODEL_SIZE;
       const scaleY = h / MODEL_SIZE;
       const rgb = hexToRgb(currentColor);
-      const THRESHOLD = 0.42;
+      const THRESHOLD = 0.62;
 
       let nailPixels = 0;
       for (let y = 0; y < MODEL_SIZE; y++) {
@@ -193,9 +193,9 @@
             for (let dy = 0; dy < Math.ceil(scaleY) && py + dy < h; dy++) {
               for (let dx = 0; dx < Math.ceil(scaleX) && px + dx < w; dx++) {
                 const i = ((py + dy) * w + (px + dx)) * 4;
-                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.75) + rgb.r * strength * 0.75;
-                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.75) + rgb.g * strength * 0.75;
-                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.75) + rgb.b * strength * 0.75;
+                imageData.data[i]   = imageData.data[i]   * (1 - strength * 0.85) + rgb.r * strength * 0.85;
+                imageData.data[i+1] = imageData.data[i+1] * (1 - strength * 0.85) + rgb.g * strength * 0.85;
+                imageData.data[i+2] = imageData.data[i+2] * (1 - strength * 0.85) + rgb.b * strength * 0.85;
               }
             }
           }
